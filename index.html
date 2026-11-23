@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PiQuest — Daily Quiz Quest for Pioneers</title>
+<meta name="description" content="PiQuest is a daily quiz quest for Pi Pioneers: 10 fresh questions every day, streaks, badges and a weekly leaderboard.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<!-- Pi Network SDK (loads in any browser; only activates inside Pi Browser) -->
+<script src="https://sdk.minepi.com/pi-sdk.js"></script>
+<style>
+  :root{
+    --pi-purple:#5b2a86; --pi-purple-dark:#3d1a5e; --pi-gold:#f5b942; --pi-gold-dark:#d99a1f;
+    --bg:#241031; --card:#ffffff; --ink:#22162e; --muted:#7a6f86; --good:#1faa55; --bad:#e0483e;
+    --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(180deg,var(--pi-purple-dark) 0%,var(--bg) 340px,#1a0b26 100%);
+    color:var(--ink); min-height:100vh;
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:16px 14px 40px;}
+  /* Header */
+  header{display:flex;align-items:center;gap:10px;color:#fff;padding:6px 2px 14px;}
+  header img{width:44px;height:44px;border-radius:12px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+  header .title{flex:1;min-width:0;}
+  header h1{font-size:22px;margin:0;letter-spacing:.3px;}
+  header h1 .gold{color:var(--pi-gold);}
+  header p{margin:2px 0 0;font-size:12.5px;color:#d9c8ee;}
+  .badge-mode{font-size:11px;font-weight:700;padding:5px 9px;border-radius:999px;background:rgba(255,255,255,.16);color:#fff;white-space:nowrap;}
+  .badge-mode.pi{background:var(--pi-gold);color:#3d2700;}
+  /* Stat strip */
+  .stats{display:flex;gap:8px;margin-bottom:12px;}
+  .stat{flex:1;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:9px 6px;text-align:center;color:#fff;}
+  .stat b{display:block;font-size:17px;}
+  .stat span{font-size:11px;color:#d9c8ee;text-transform:uppercase;letter-spacing:.5px;}
+  /* Cards */
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:12px;box-shadow:0 8px 24px rgba(0,0,0,.28);}
+  .card h2{margin:0 0 6px;font-size:18px;}
+  .card h3{margin:0 0 8px;font-size:15px;}
+  .card p{margin:0 0 10px;color:var(--muted);font-size:14px;line-height:1.45;}
+  .hidden{display:none !important;}
+  /* Buttons */
+  .btn{display:block;width:100%;border:none;cursor:pointer;border-radius:12px;padding:14px;font-size:16px;font-weight:700;
+       background:linear-gradient(180deg,var(--pi-gold),var(--pi-gold-dark));color:#33230a;box-shadow:0 4px 0 #a8740d;transition:transform .05s;}
+  .btn:active{transform:translateY(2px);box-shadow:0 2px 0 #a8740d;}
+  .btn:disabled{opacity:.55;cursor:default;}
+  .btn.secondary{background:#efe7f7;color:var(--pi-purple);box-shadow:0 4px 0 #cbb8e4;}
+  .btn.ghost{background:transparent;color:var(--pi-purple);box-shadow:none;border:2px solid #e2d4f2;}
+  .btn.small{padding:10px;font-size:14px;}
+  /* Quiz */
+  .qmeta{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+  .chip{font-size:11.5px;font-weight:700;padding:4px 10px;border-radius:999px;background:#efe7f7;color:var(--pi-purple);text-transform:uppercase;letter-spacing:.4px;}
+  .timer{font-weight:800;font-size:15px;color:var(--pi-purple);}
+  .timer.low{color:var(--bad);}
+  .bar{height:8px;background:#efe7f7;border-radius:99px;overflow:hidden;margin-bottom:14px;}
+  .bar > div{height:100%;background:linear-gradient(90deg,var(--pi-purple),var(--pi-gold));width:0%;transition:width .3s;}
+  .question{font-size:19px;font-weight:700;line-height:1.35;margin:4px 0 16px;}
+  .opt{display:block;width:100%;text-align:left;background:#faf7fd;border:2px solid #e7dcf3;border-radius:12px;
+       padding:13px 14px;font-size:15.5px;margin-bottom:9px;cursor:pointer;color:var(--ink);}
+  .opt:active{border-color:var(--pi-purple);}
+  .opt.correct{background:#e4f7ec;border-color:var(--good);color:#0d6b34;font-weight:700;}
+  .opt.wrong{background:#fdeceb;border-color:var(--bad);color:#8f231c;font-weight:700;}
+  .opt.dim{opacity:.45;}
+  .opt.eliminated{opacity:.3;text-decoration:line-through;pointer-events:none;}
+  .quizfoot{display:flex;gap:8px;margin-top:6px;}
+  .quizfoot .btn{flex:1;}
+  /* Leaderboard */
+  table{width:100%;border-collapse:collapse;font-size:14.5px;}
+  td,th{padding:8px 6px;border-bottom:1px solid #f0e9f7;text-align:left;}
+  tr.me td{background:#fdf3d7;font-weight:800;}
+  td.rank{width:34px;color:var(--muted);font-weight:700;}
+  td.pts{text-align:right;font-weight:700;}
+  /* Badges */
+  .badges{display:flex;flex-wrap:wrap;gap:8px;}
+  .bdg{flex:1 1 30%;min-width:96px;text-align:center;border:2px dashed #e2d4f2;border-radius:12px;padding:10px 6px;font-size:12px;color:var(--muted);}
+  .bdg .emo{font-size:24px;display:block;margin-bottom:4px;filter:grayscale(1);opacity:.4;}
+  .bdg.earned{border-style:solid;border-color:var(--pi-gold);background:#fffaf0;color:var(--ink);font-weight:700;}
+  .bdg.earned .emo{filter:none;opacity:1;}
+  /* Results */
+  .bigscore{text-align:center;padding:6px 0 2px;}
+  .bigscore .num{font-size:46px;font-weight:900;color:var(--pi-purple);}
+  .bigscore .lbl{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:1px;}
+  .countdown{font-variant-numeric:tabular-nums;font-weight:800;color:var(--pi-purple);}
+  footer{text-align:center;color:#bda9d6;font-size:12px;padding:10px 20px 0;line-height:1.6;}
+  footer a{color:var(--pi-gold);}
+  .toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#22162e;color:#fff;padding:11px 16px;border-radius:999px;
+         font-size:14px;box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .25s;max-width:92vw;text-align:center;z-index:50;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img src="logo.svg" alt="PiQuest logo">
+    <div class="title">
+      <h1>Pi<span class="gold">Quest</span></h1>
+      <p id="greeting">Loading your quest…</p>
+    </div>
+    <div class="badge-mode" id="modeBadge">…</div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><b id="statPoints">0</b><span>Points</span></div>
+    <div class="stat"><b id="statStreak">0 🔥</b><span>Day streak</span></div>
+    <div class="stat"><b id="statHints">0 💡</b><span>Hints</span></div>
+  </div>
+
+  <!-- HOME VIEW -->
+  <section id="view-home">
+    <div class="card">
+      <h2 id="todayTitle">Today's Quest</h2>
+      <p id="todayText">10 fresh questions, the same set for every Pioneer today. Answer fast for bonus points, keep your streak alive, and climb this week's leaderboard.</p>
+      <button class="btn" id="btnStart">▶ Start Today's Quest</button>
+      <button class="btn ghost small hidden" id="btnPractice" style="margin-top:9px;">Practice replay (no points)</button>
+      <p class="hidden" id="nextQuestLine" style="margin-top:12px;">Next quest in <span class="countdown" id="countdown">--:--:--</span></p>
+    </div>
+
+    <div class="card">
+      <h3>🏆 This Week's Leaderboard</h3>
+      <table id="leaderboard"><tbody></tbody></table>
+      <p style="margin-top:8px;font-size:12px;">Demo leaderboard with sample Pioneers — your real score is the row highlighted in gold.</p>
+    </div>
+
+    <div class="card">
+      <h3>🎖️ Streak Badges</h3>
+      <div class="badges" id="badges"></div>
+    </div>
+
+    <div class="card">
+      <h3>💡 Power-Up: Hint Pack</h3>
+      <p>Get <b>+5 hints</b>. A hint removes two wrong answers from a question. Sandbox demo price: <b>0.1 test-Pi</b>.</p>
+      <button class="btn secondary" id="btnBuyHints">Buy Hint Pack — 0.1 test-Pi (demo)</button>
+    </div>
+  </section>
+
+  <!-- QUIZ VIEW -->
+  <section id="view-quiz" class="hidden">
+    <div class="card">
+      <div class="qmeta">
+        <span class="chip" id="qCategory">General</span>
+        <span class="timer" id="qTimer">20s</span>
+      </div>
+      <div class="bar"><div id="qProgress"></div></div>
+      <div class="question" id="qText"></div>
+      <div id="qOptions"></div>
+      <div class="quizfoot">
+        <button class="btn ghost small" id="btnHint">💡 Use Hint</button>
+        <button class="btn ghost small" id="btnQuit">Quit</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULT VIEW -->
+  <section id="view-result" class="hidden">
+    <div class="card">
+      <div class="bigscore">
+        <div class="lbl" id="resLabel">Quest complete</div>
+        <div class="num" id="resScore">0</div>
+        <div class="lbl">points earned</div>
+      </div>
+      <p id="resDetail" style="text-align:center;margin-top:10px;"></p>
+      <p id="resBadge" style="text-align:center;font-weight:700;color:var(--pi-purple);"></p>
+      <button class="btn" id="btnHome">Back to Home</button>
+    </div>
+  </section>
+
+  <footer>
+    PiQuest — a Pi Next hackathon demo. Runs in Pi Browser with your Pi account, or in any browser in demo mode.<br>
+    <a href="privacy.html">Privacy Policy</a>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============================================================
+   PiQuest — Daily Quiz Quest for Pi Pioneers
+   Pi Next hackathon build. Client-side only; state in localStorage.
+   ============================================================ */
+
+/* ---------- Question bank (72 questions, 6 categories) ---------- */
+/* Format: [category, question, [4 options], correctIndex] */
+const QUESTION_BANK = [
+  /* General knowledge */
+  ["General","How many continents are there on Earth?",["Five","Six","Seven","Eight"],2],
+  ["General","What is the largest planet in our solar system?",["Saturn","Jupiter","Neptune","Earth"],1],
+  ["General","Which animal is known as \"man's best friend\"?",["Cat","Horse","Dog","Parrot"],2],
+  ["General","How many minutes are there in a full week?",["10,080","9,600","7,200","12,000"],0],
+  ["General","What is the main ingredient in guacamole?",["Tomato","Avocado","Onion","Pepper"],1],
+  ["General","Which color do you get by mixing blue and yellow paint?",["Purple","Orange","Green","Brown"],2],
+  ["General","How many sides does a hexagon have?",["Five","Six","Seven","Eight"],1],
+  ["General","What do bees produce?",["Honey","Milk","Silk","Cheese"],0],
+  ["General","Which instrument is used to measure temperature?",["Barometer","Thermometer","Altimeter","Speedometer"],1],
+  ["General","What is the fastest land animal?",["Lion","Horse","Cheetah","Gazelle"],2],
+  ["General","How many letters are in the English alphabet?",["24","25","26","27"],2],
+  ["General","According to the saying, which fruit \"keeps the doctor away\"?",["Banana","Apple","Orange","Grape"],1],
+  /* Science */
+  ["Science","What is the chemical symbol for gold?",["Au","Ag","Gd","Go"],0],
+  ["Science","How many bones are in the adult human body?",["186","206","226","256"],1],
+  ["Science","Which planet is known as the Red Planet?",["Venus","Jupiter","Mars","Mercury"],2],
+  ["Science","Which force keeps our feet on the ground?",["Magnetism","Friction","Inertia","Gravity"],3],
+  ["Science","Which gas do plants absorb from the air?",["Oxygen","Carbon dioxide","Nitrogen","Helium"],1],
+  ["Science","Roughly how fast does light travel in a vacuum?",["300 km/s","3,000 km/s","30,000 km/s","300,000 km/s"],3],
+  ["Science","What is the hardest naturally occurring substance on Earth?",["Quartz","Diamond","Titanium","Obsidian"],1],
+  ["Science","Which part of the cell is called its \"powerhouse\"?",["Nucleus","Ribosome","Mitochondria","Golgi body"],2],
+  ["Science","What is the chemical formula for common table salt?",["NaCl","KCl","CaCO3","H2SO4"],0],
+  ["Science","Which organ pumps blood through the human body?",["Liver","Lung","Heart","Kidney"],2],
+  ["Science","Which gas do humans need to breathe to live?",["Carbon dioxide","Oxygen","Hydrogen","Nitrogen"],1],
+  ["Science","At sea level, water boils at what temperature?",["90°C","95°C","100°C","110°C"],2],
+  /* Geography */
+  ["Geography","What is the capital of Japan?",["Kyoto","Osaka","Tokyo","Nagoya"],2],
+  ["Geography","Which is the largest hot desert in the world?",["Gobi","Sahara","Arabian","Kalahari"],1],
+  ["Geography","Which river is generally considered the longest in the world?",["Amazon","Yangtze","Mississippi","Nile"],3],
+  ["Geography","What is the capital of Australia?",["Sydney","Canberra","Melbourne","Perth"],1],
+  ["Geography","Mount Everest is part of which mountain range?",["Andes","Alps","Himalayas","Rockies"],2],
+  ["Geography","Which country has the largest population in the world?",["China","United States","Indonesia","India"],3],
+  ["Geography","What is the capital of Canada?",["Toronto","Vancouver","Ottawa","Montreal"],2],
+  ["Geography","The Great Wall is located in which country?",["Japan","China","Mongolia","Korea"],1],
+  ["Geography","What is the smallest country in the world?",["Monaco","Malta","Vatican City","Liechtenstein"],2],
+  ["Geography","Which is the largest ocean on Earth?",["Atlantic","Indian","Arctic","Pacific"],3],
+  ["Geography","What is the capital of Brazil?",["Rio de Janeiro","São Paulo","Brasília","Salvador"],2],
+  ["Geography","The Sahara Desert is located on which continent?",["Asia","Africa","Australia","South America"],1],
+  /* Pi & Crypto */
+  ["Pi & Crypto","In which year was Bitcoin created?",["2007","2009","2011","2013"],1],
+  ["Pi & Crypto","Who is credited with creating Bitcoin?",["Vitalik Buterin","Elon Musk","Satoshi Nakamoto","Charles Hoskinson"],2],
+  ["Pi & Crypto","What is a blockchain?",["A type of computer virus","A distributed digital ledger","A social media platform","A video game currency"],1],
+  ["Pi & Crypto","Pi Network was founded by graduates of which university?",["Harvard","MIT","Stanford","Oxford"],2],
+  ["Pi & Crypto","In proof-of-work networks, validating transactions to earn rewards is called…",["Staking","Mining","Farming","Minting"],1],
+  ["Pi & Crypto","What does \"HODL\" mean in crypto slang?",["Sell everything quickly","Hold a cryptocurrency long term","A type of wallet","A trading bot"],1],
+  ["Pi & Crypto","Which cryptocurrency is the native asset of the Ethereum network?",["Bitcoin","Ether","Litecoin","Dogecoin"],1],
+  ["Pi & Crypto","What is a crypto wallet mainly used for?",["Mining coins by itself","Storing the keys that control your crypto","Printing money","Watching prices only"],1],
+  ["Pi & Crypto","Pi Network is designed so Pioneers mine primarily using…",["Supercomputers","Graphics cards","Mobile phones","Bank servers"],2],
+  ["Pi & Crypto","What is a \"mainnet\"?",["A test network for developers","The live, production blockchain network","A mining pool","A crypto exchange"],1],
+  ["Pi & Crypto","What does KYC stand for?",["Keep Your Coins","Know Your Customer","Key Yield Calculation","Korean Yield Coin"],1],
+  ["Pi & Crypto","What should you do with your private key or passphrase?",["Share it with support staff","Post it online","Never share it with anyone","Email it to yourself daily"],2],
+  /* Sports */
+  ["Sports","How many players does a football (soccer) team field at once?",["9","10","11","12"],2],
+  ["Sports","In which sport would you perform a slam dunk?",["Volleyball","Basketball","Tennis","Handball"],1],
+  ["Sports","How often are the Summer Olympic Games held?",["Every 2 years","Every 3 years","Every 4 years","Every 5 years"],2],
+  ["Sports","In tennis, a score of zero is called…",["Duck","Love","Nil","Ace"],1],
+  ["Sports","How many rings appear on the Olympic flag?",["4","5","6","7"],1],
+  ["Sports","Which sport uses a shuttlecock?",["Squash","Badminton","Table tennis","Cricket"],1],
+  ["Sports","A marathon is approximately how long?",["26 km","32 km","42 km","50 km"],2],
+  ["Sports","In golf, one stroke under par on a hole is called a…",["Bogey","Eagle","Birdie","Albatross"],2],
+  ["Sports","Which country won the first FIFA World Cup in 1930?",["Brazil","Uruguay","Italy","England"],1],
+  ["Sports","Usain Bolt became famous in which sport?",["Swimming","Boxing","Sprinting","Cycling"],2],
+  ["Sports","In boxing, \"KO\" stands for…",["Kick Out","Knockout","Keep On","King's Order"],1],
+  ["Sports","Which sport is nicknamed \"the beautiful game\"?",["Rugby","Cricket","Football (soccer)","Baseball"],2],
+  /* History */
+  ["History","Who was the first President of the United States?",["Abraham Lincoln","George Washington","Thomas Jefferson","John Adams"],1],
+  ["History","In which year did the Titanic sink?",["1905","1912","1918","1923"],1],
+  ["History","World War II ended in which year?",["1943","1944","1945","1947"],2],
+  ["History","Who painted the Mona Lisa?",["Vincent van Gogh","Pablo Picasso","Leonardo da Vinci","Claude Monet"],2],
+  ["History","In which year did the Berlin Wall fall?",["1985","1987","1989","1991"],2],
+  ["History","Ancient Egyptians wrote using…",["Latin letters","Hieroglyphs","Runes","Cuneiform only"],1],
+  ["History","Who was the first person to walk on the Moon?",["Buzz Aldrin","Yuri Gagarin","Neil Armstrong","Michael Collins"],2],
+  ["History","What was the main language of the Roman Empire?",["Greek","Latin","Arabic","Hebrew"],1],
+  ["History","Which ship carried the Pilgrims to America in 1620?",["Santa Maria","Mayflower","Beagle","Endeavour"],1],
+  ["History","In which year did Indonesia proclaim its independence?",["1942","1945","1949","1955"],1],
+  ["History","Who was Britain's Prime Minister for most of World War II?",["Neville Chamberlain","Winston Churchill","Clement Attlee","Anthony Eden"],1],
+  ["History","The movable-type printing press was invented by…",["Isaac Newton","Galileo Galilei","Johannes Gutenberg","Leonardo da Vinci"],2]
+];
+
+/* ---------- Small utilities ---------- */
+const $ = (id) => document.getElementById(id);
+function todayKey(d){ d = d || new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+function weekKey(d){
+  d = d || new Date();
+  const jan1 = new Date(d.getFullYear(),0,1);
+  const week = Math.floor(((d - jan1) / 86400000 + jan1.getDay()) / 7);
+  return d.getFullYear()+"-W"+week;
+}
+function seedFromString(s){ let h = 2166136261; for (let i=0;i<s.length;i++){ h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function mulberry32(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 2600); }
+
+/* ---------- Persistent state (localStorage) ---------- */
+const LS_KEY = "piquest_state_v1";
+let state = {
+  username: null,        // Pi username, or guest name in demo mode
+  totalPoints: 0,
+  hints: 3,              // every Pioneer starts with 3 free hints
+  streakCount: 0,
+  streakLastDate: null,  // last day a quest was completed (todayKey)
+  week: { key: weekKey(), points: 0 },
+  results: {},           // dateKey -> { score, correct, total }
+  badges: []             // earned badge ids
+};
+try {
+  const saved = JSON.parse(localStorage.getItem(LS_KEY) || "null");
+  if (saved && typeof saved === "object") state = Object.assign(state, saved);
+} catch(e) { /* corrupted state -> start fresh */ }
+if (state.week.key !== weekKey()) state.week = { key: weekKey(), points: 0 };
+function save(){ try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch(e){} }
+
+/* ---------- Badges ---------- */
+const BADGES = [
+  { id:"streak3",  emo:"🔥", name:"On Fire",      desc:"3-day streak" },
+  { id:"streak7",  emo:"⚡", name:"Week Warrior", desc:"7-day streak" },
+  { id:"streak30", emo:"👑", name:"Pi Legend",    desc:"30-day streak" },
+  { id:"perfect",  emo:"🎯", name:"Perfect Round",desc:"10/10 in one quest" },
+  { id:"rich",     emo:"💰", name:"Point Baron",  desc:"5,000 total points" },
+  { id:"first",    emo:"🌟", name:"First Quest",  desc:"Finish a daily quest" }
+];
+function checkBadges(){
+  const newly = [];
+  const grant = (id) => { if (!state.badges.includes(id)) { state.badges.push(id); newly.push(id); } };
+  if (state.streakCount >= 3)  grant("streak3");
+  if (state.streakCount >= 7)  grant("streak7");
+  if (state.streakCount >= 30) grant("streak30");
+  if (state.totalPoints >= 5000) grant("rich");
+  return newly;
+}
+function renderBadges(){
+  $("badges").innerHTML = BADGES.map(b => {
+    const earned = state.badges.includes(b.id);
+    return '<div class="bdg'+(earned?" earned":"")+'"><span class="emo">'+b.emo+'</span>'+b.name+'<br><small>'+b.desc+'</small></div>';
+  }).join("");
+}
+
+/* ---------- Daily question set (same for everyone, seeded by date) ---------- */
+function dailyQuestions(dateStr){
+  const rnd = mulberry32(seedFromString("piquest-" + dateStr));
+  const pool = QUESTION_BANK.slice();
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = pool[i]; pool[i] = pool[j]; pool[j] = t; }
+  return pool.slice(0, 10).map(q => {
+    // shuffle options too, tracking the correct answer by value
+    const correctText = q[2][q[3]];
+    const opts = q[2].slice();
+    for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = opts[i]; opts[i] = opts[j]; opts[j] = t; }
+    return { category: q[0], text: q[1], options: opts, answer: opts.indexOf(correctText) };
+  });
+}
+
+/* ---------- Leaderboard (demo rivals + the player) ---------- */
+const RIVALS = ["CryptoEagle","PiMiner88","MoonWalker_pi","QuizzyBee","StellarSam","PiDayDreamer","NodeRunner","GalaxyGwen","TurboTurtle","OrbitOmar"];
+function renderLeaderboard(){
+  const rnd = mulberry32(seedFromString("pq-board-" + state.week.key));
+  const rows = RIVALS.map(name => ({ name, pts: 300 + Math.floor(rnd() * 2400) }));
+  rows.push({ name: state.username || "You", pts: state.week.points, me: true });
+  rows.sort((a,b) => b.pts - a.pts);
+  $("leaderboard").querySelector("tbody").innerHTML = rows.map((r,i) =>
+    '<tr'+(r.me?' class="me"':'')+'><td class="rank">'+(i+1)+'</td><td>'+escapeHtml(r.name)+(r.me?" (you)":"")+'</td><td class="pts">'+r.pts.toLocaleString()+'</td></tr>'
+  ).join("");
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+/* ---------- Header / home rendering ---------- */
+let appMode = "demo"; // "pi" when authenticated through the Pi SDK
+function renderHome(){
+  $("statPoints").textContent = state.totalPoints.toLocaleString();
+  $("statStreak").textContent = state.streakCount + " 🔥";
+  $("statHints").textContent = state.hints + " 💡";
+  $("greeting").textContent = state.username ? ("Hello, " + state.username + "! Ready for today's quest?") : "Welcome, Pioneer!";
+  const mb = $("modeBadge");
+  if (appMode === "pi") { mb.textContent = "Pi Browser ✓"; mb.classList.add("pi"); }
+  else { mb.textContent = "Demo mode"; mb.classList.remove("pi"); }
+  const done = state.results[todayKey()];
+  if (done) {
+    $("todayTitle").textContent = "Today's Quest — Completed ✓";
+    $("todayText").textContent = "You scored " + done.score.toLocaleString() + " points (" + done.correct + "/" + done.total + " correct). Come back tomorrow for a fresh set — or replay now for practice.";
+    $("btnStart").textContent = "↻ Replay (practice)";
+    $("btnPractice").classList.add("hidden");
+    $("nextQuestLine").classList.remove("hidden");
+  } else {
+    $("todayTitle").textContent = "Today's Quest";
+    $("btnStart").textContent = "▶ Start Today's Quest";
+    $("nextQuestLine").classList.add("hidden");
+  }
+  renderBadges();
+  renderLeaderboard();
+}
+function tickCountdown(){
+  const el = $("countdown");
+  if (!el || $("nextQuestLine").classList.contains("hidden")) return;
+  const now = new Date(); const mid = new Date(now); mid.setHours(24,0,0,0);
+  let s = Math.max(0, Math.floor((mid - now) / 1000));
+  const h = String(Math.floor(s/3600)).padStart(2,"0"), m = String(Math.floor(s%3600/60)).padStart(2,"0"), ss = String(s%60).padStart(2,"0");
+  el.textContent = h+":"+m+":"+ss;
+}
+setInterval(tickCountdown, 1000);
+
+/* ---------- Quiz engine ---------- */
+const QUESTION_SECONDS = 20;
+let quiz = null; // { list, idx, score, correct, timerId, timeLeft, locked, practice }
+function showView(name){
+  ["home","quiz","result"].forEach(v => $("view-"+v).classList.toggle("hidden", v !== name));
+  window.scrollTo(0,0);
+}
+function startQuiz(practice){
+  quiz = { list: dailyQuestions(todayKey()), idx: 0, score: 0, correct: 0, locked: false, practice: !!practice, timeLeft: QUESTION_SECONDS };
+  showView("quiz");
+  renderQuestion();
+}
+function renderQuestion(){
+  const q = quiz.list[quiz.idx];
+  quiz.locked = false; quiz.timeLeft = QUESTION_SECONDS;
+  $("qCategory").textContent = q.category + " · " + (quiz.idx+1) + " of " + quiz.list.length;
+  $("qProgress").style.width = (quiz.idx / quiz.list.length * 100) + "%";
+  $("qText").textContent = q.text;
+  $("qTimer").textContent = QUESTION_SECONDS + "s"; $("qTimer").classList.remove("low");
+  $("btnHint").disabled = state.hints <= 0;
+  $("btnHint").textContent = "💡 Use Hint (" + state.hints + ")";
+  $("qOptions").innerHTML = q.options.map((o,i) => '<button class="opt" data-i="'+i+'">'+escapeHtml(o)+'</button>').join("");
+  Array.prototype.forEach.call($("qOptions").querySelectorAll(".opt"), btn => {
+    btn.addEventListener("click", () => answer(parseInt(btn.getAttribute("data-i"), 10)));
+  });
+  clearInterval(quiz.timerId);
+  quiz.timerId = setInterval(() => {
+    quiz.timeLeft--;
+    $("qTimer").textContent = Math.max(0, quiz.timeLeft) + "s";
+    if (quiz.timeLeft <= 5) $("qTimer").classList.add("low");
+    if (quiz.timeLeft <= 0) { clearInterval(quiz.timerId); answer(-1); }
+  }, 1000);
+}
+function answer(chosen){
+  if (!quiz || quiz.locked) return;
+  quiz.locked = true; clearInterval(quiz.timerId);
+  const q = quiz.list[quiz.idx];
+  const buttons = $("qOptions").querySelectorAll(".opt");
+  buttons.forEach((b,i) => {
+    if (i === q.answer) b.classList.add("correct");
+    else if (i === chosen) b.classList.add("wrong");
+    else b.classList.add("dim");
+    b.disabled = true;
+  });
+  if (chosen === q.answer) {
+    quiz.correct++;
+    quiz.score += 100 + Math.max(0, quiz.timeLeft) * 2; // speed bonus
+  }
+  setTimeout(() => {
+    quiz.idx++;
+    if (quiz.idx < quiz.list.length) renderQuestion();
+    else finishQuiz();
+  }, 950);
+}
+function useHint(){
+  if (!quiz || quiz.locked || state.hints <= 0) return;
+  const q = quiz.list[quiz.idx];
+  const wrong = q.options.map((o,i) => i).filter(i => i !== q.answer);
+  // eliminate two wrong options (seeded shuffle so it varies)
+  const rnd = mulberry32(seedFromString("hint-" + todayKey() + "-" + quiz.idx + "-" + state.hints));
+  wrong.sort(() => rnd() - 0.5);
+  const kill = wrong.slice(0, 2);
+  $("qOptions").querySelectorAll(".opt").forEach((b,i) => { if (kill.includes(i)) b.classList.add("eliminated"); });
+  state.hints--; save(); renderHeaderStatsOnly();
+  $("btnHint").disabled = true; $("btnHint").textContent = "💡 Hint used";
+}
+function renderHeaderStatsOnly(){
+  $("statPoints").textContent = state.totalPoints.toLocaleString();
+  $("statStreak").textContent = state.streakCount + " 🔥";
+  $("statHints").textContent = state.hints + " 💡";
+}
+function finishQuiz(){
+  clearInterval(quiz && quiz.timerId);
+  const key = todayKey();
+  const firstToday = !state.results[key];
+  let badgeMsg = "";
+  if (!quiz.practice && firstToday) {
+    state.results[key] = { score: quiz.score, correct: quiz.correct, total: quiz.list.length };
+    state.totalPoints += quiz.score;
+    state.week.points += quiz.score;
+    // streak: yesterday -> +1, today already -> keep, older -> restart at 1
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    if (state.streakLastDate === key) { /* already counted */ }
+    else if (state.streakLastDate === todayKey(y)) state.streakCount++;
+    else state.streakCount = 1;
+    state.streakLastDate = key;
+    if (quiz.correct === quiz.list.length && !state.badges.includes("perfect")) state.badges.push("perfect");
+    if (!state.badges.includes("first")) state.badges.push("first");
+    const newly = checkBadges();
+    if (newly.length) badgeMsg = "New badge unlocked: " + newly.map(id => { const b = BADGES.find(x => x.id === id); return b ? (b.emo + " " + b.name) : id; }).join(", ");
+    save();
+  }
+  $("resLabel").textContent = quiz.practice ? "Practice complete" : (firstToday ? "Quest complete!" : "Quest replayed");
+  $("resScore").textContent = quiz.score.toLocaleString();
+  $("resDetail").textContent = "You answered " + quiz.correct + " of " + quiz.list.length + " correctly." +
+    (quiz.practice || !firstToday ? " Practice runs don't add points — your official score for today is already saved." :
+     " Streak: " + state.streakCount + " day" + (state.streakCount === 1 ? "" : "s") + " 🔥");
+  $("resBadge").textContent = badgeMsg;
+  quiz = null;
+  showView("result");
+  renderHome();
+}
+
+/* ---------- Pi SDK integration ---------- */
+function onIncompletePaymentFound(payment){
+  // DEMO ONLY: a production app must resolve incomplete payments with its server.
+  console.log("[PiQuest demo] incomplete payment found:", payment && payment.identifier);
+}
+function setGuestMode(){
+  appMode = "demo";
+  if (!state.username) { state.username = "Guest Pioneer"; save(); }
+  renderHome();
+}
+async function initPi(){
+  if (!window.Pi) { setGuestMode(); return; }
+  try {
+    Pi.init({ version: "2.0", sandbox: true }); // sandbox = testnet, for hackathon demo
+    const authPromise = Pi.authenticate(["username"], onIncompletePaymentFound);
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("auth timeout")), 6000));
+    const auth = await Promise.race([authPromise, timeout]);
+    if (auth && auth.user && auth.user.username) {
+      state.username = auth.user.username; save();
+      appMode = "pi";
+      renderHome();
+      toast("Signed in as " + auth.user.username + " ✓");
+      return;
+    }
+    setGuestMode();
+  } catch (e) {
+    console.log("[PiQuest] Pi auth unavailable, demo mode:", e && e.message);
+    setGuestMode();
+  }
+}
+
+/* ---------- Power-Up purchase (SANDBOX / DEMO payment stub) ---------- */
+/* Client-side only demo: the approval/completion callbacks below stand in for
+   the server endpoints a production app must implement
+   (POST /payments/approve and POST /payments/complete). No real Pi moves here. */
+function grantHintPack(){
+  state.hints += 5; save(); renderHome();
+  toast("Hint Pack added: +5 hints 💡 (you now have " + state.hints + ")");
+}
+function buyHintPack(){
+  if (appMode !== "pi" || !window.Pi) {
+    // Outside Pi Browser: simulate the purchase so judges can test the flow.
+    toast("Demo mode: simulating a 0.1 test-Pi payment…");
+    setTimeout(grantHintPack, 700);
+    return;
+  }
+  try {
+    Pi.createPayment(
+      { amount: 0.1, memo: "PiQuest Hint Pack (+5 hints) — sandbox demo", metadata: { type: "hint_pack", app: "PiQuest" } },
+      {
+        onReadyForServerApproval: function(paymentId){
+          console.log("[PiQuest demo] would call server approve for", paymentId);
+          // DEMO STUB: production code must POST to its own server here.
+        },
+        onReadyForServerCompletion: function(paymentId, txid){
+          console.log("[PiQuest demo] would call server complete for", paymentId, txid);
+          grantHintPack(); // DEMO STUB: grant after simulated completion
+        },
+        onCancel: function(){ toast("Payment cancelled."); },
+        onError: function(err){ console.log("[PiQuest] payment error", err); toast("Payment not completed — no Pi was charged (sandbox demo)."); }
+      }
+    );
+  } catch (e) {
+    console.log("[PiQuest] createPayment failed", e);
+    toast("Payments are unavailable here — try inside Pi Browser.");
+  }
+}
+
+/* ---------- Wire up UI ---------- */
+$("btnStart").addEventListener("click", () => startQuiz(!!state.results[todayKey()]));
+$("btnPractice").addEventListener("click", () => startQuiz(true));
+$("btnHint").addEventListener("click", useHint);
+$("btnQuit").addEventListener("click", () => { if (quiz) clearInterval(quiz.timerId); quiz = null; showView("home"); renderHome(); });
+$("btnHome").addEventListener("click", () => { showView("home"); renderHome(); });
+$("btnBuyHints").addEventListener("click", buyHintPack);
+
+/* ---------- Boot ---------- */
+renderHome();
+initPi();
+</script>
+</body>
+</html>

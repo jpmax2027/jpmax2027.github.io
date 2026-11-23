@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="PiQuest logo">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#7b3fb8"/>
+      <stop offset="1" stop-color="#3d1a5e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd97a"/>
+      <stop offset="1" stop-color="#d99a1f"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="248" height="248" rx="56" fill="url(#bg)"/>
+  <!-- Pi symbol -->
+  <text x="118" y="168" font-family="Georgia, 'Times New Roman', serif" font-size="150" font-weight="bold" fill="url(#gold)" text-anchor="middle">&#960;</text>
+  <!-- Question mark badge -->
+  <circle cx="188" cy="70" r="36" fill="url(#gold)" stroke="#3d1a5e" stroke-width="5"/>
+  <text x="188" y="88" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="bold" fill="#3d1a5e" text-anchor="middle">?</text>
+</svg>
